@@ -1,0 +1,195 @@
+#!/bin/sh
+
+usage() {
+    UTIL_NAME=$(basename "$0")
+
+    cat << EOF
+Usage: ${UTIL_NAME} <mime-type> <extension>
+
+Create and register a new MIME type in the system.
+
+Arguments:
+    mime-type    The MIME type (e.g., application/x-myformat)
+    extension    File extension without dot (e.g., myf)
+
+Optional arguments:
+    -d, --description   Description of the file type
+    -i, --icon          Icon name or path
+    -s, --silent        Do not display any messages
+    -g, --global        Register the MIME type system-wide
+    -h, --help          Display this help message
+    -o, --open          Application to open the file
+
+Examples:
+    ${UTIL_NAME} application/x-myscript myscript
+    sudo ${UTIL_NAME} image/x-raw raw -g -d "Camera Raw Image" -i ~/Images/icons/camera.png
+
+Note: This script requires 'mimetype' and 'potrace' utilities to be installed on your system.
+EOF
+    exit 1
+}
+
+# Check if mimetype utility is available
+if ! which mimetype >/dev/null 2>&1; then
+    echo "Error: 'mimetype' utility is not installed on your system."
+    echo "Please install it using your distribution's package manager."
+    echo "look for:"
+    echo "- « perl-file-mimeinfo » on arch-based ;"
+    echo "- « libfile-mimeinfo-perl » on debian-based."
+    exit 1
+fi
+
+# Check if potrace utility is available
+if ! which potrace >/dev/null 2>&1; then
+    echo "Error: 'potrace' utility is not installed on your system."
+    echo "Please install it using your distribution's package manager."
+    echo "look for:"
+    echo "- « potrace » on arch-based ;"
+    echo "- « libpotrace-dev » on debian-based."
+    exit 1
+fi
+
+# Initialize variables
+MIME_TYPE=""
+EXTENSION=""
+DESCRIPTION=""
+ICON=""
+OPEN=""
+SILENT=0
+GLOBAL=0
+
+# Parse command line arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h|--help)
+            usage
+            ;;
+        -d|--description)
+            [ -z "$2" ] || [ $(expr "$2" : "-*") -gt 0 ] && echo "Error: --description requires an argument" && exit 1
+
+            DESCRIPTION="$2"
+            shift 2
+            ;;
+        -i|--icon)
+            [ -z "$2" ] || [ $(expr "$2" : "-*") -gt 0 ] && echo "Error: --icon requires an argument" && exit 1
+            ICON="$2"
+            shift 2
+            ;;
+        -o|--open)
+            [ -z "$2" ] || [ $(expr "$2" : "-*") -gt 0 ] && echo "Error: --open requires an argument" && exit 1
+            OPEN="$2"
+            shift 2
+            ;;
+        -s|--silent)
+            SILENT=1
+            shift
+            ;;
+        -g|--global)
+            GLOBAL=1
+            shift
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            usage
+            ;;
+        *)
+            if [ -z "$MIME_TYPE" ]; then
+                MIME_TYPE="$1"
+            elif [ -z "$EXTENSION" ]; then
+                EXTENSION="$1"
+            else
+                echo "Error: Unexpected argument: $1"
+                usage
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Validate required arguments
+[ -z "$MIME_TYPE" ] && echo "Error: MIME type is required" && usage
+[ -z "$EXTENSION" ] && echo "Error: Extension is required" && usage
+
+# Validate MIME type format
+case "$MIME_TYPE" in
+    */*) ;;
+    *) echo "Error: Invalid MIME type format. Must be in format 'type/subtype'" && exit 1 ;;
+esac
+
+# Check for root privileges if global installation is requested
+if [ $GLOBAL -eq 1 ]; then
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "Error: Root privileges required for global installation"
+        echo "Please run with sudo"
+        exit 1
+    fi
+fi
+
+# use mktmp to create a temporary directory
+TMP_DIR=$(mktemp -d)
+trap "rm -rf $TMP_DIR" EXIT KILL TERM
+
+# Create temporary XML file
+XML_FILE="${TMP_DIR}/${EXTENSION}-mime.xml"
+
+# Generate XML content
+cat > "$XML_FILE" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="$MIME_TYPE">
+    <comment>${DESCRIPTION:-$EXTENSION "file"}</comment>
+    <glob pattern="*.$EXTENSION"/>
+  </mime-type>
+</mime-info>
+EOF
+
+# Ensure the file was created
+if [ ! -f "$XML_FILE" ]; then
+    echo "Error: Failed to create MIME type XML file"
+    exit 1
+fi
+
+# Set icon
+if [ -n "$ICON" ]; then
+
+    # Convert icon to png
+    if [ -n "$ICON" ] && [ "${ICON##*.}" != "png" ]; then
+        NEW_ICON="${TMP_DIR}/${EXTENSION}-icon.png"
+        magick "$ICON" "$NEW_ICON"
+        ICON="$NEW_ICON"
+    fi
+
+    # Set icon
+    if [ $GLOBAL -eq 0 ]; then
+        if [ $SILENT -eq 0 ]; then
+            echo "Setting icon for MIME type $MIME_TYPE ($EXTENSION) locally..."
+        fi
+        xdg-icon-resource install --novendor --mode user --size 128 "$ICON" "$EXTENSION"
+    else
+        if [ $SILENT -eq 0 ]; then
+            echo "Setting icon for MIME type $MIME_TYPE ($EXTENSION) globally..."
+        fi
+        xdg-icon-resource install --novendor --mode system --size 128 "$ICON" "$EXTENSION"
+    fi
+fi
+
+# Register MIME type
+if [ $GLOBAL -eq 0 ]; then
+    if [ $SILENT -eq 0 ]; then
+        echo "Registering MIME type $MIME_TYPE ($EXTENSION) locally..."
+    fi
+    xdg-mime install --mode user "$XML_FILE"
+else
+    if [ $SILENT -eq 0 ]; then
+        echo "Registering MIME type $MIME_TYPE ($EXTENSION) globally..."
+    fi
+    xdg-mime install --mode system "$XML_FILE"
+fi
+
+# Open file with application
+if [ -n "$OPEN" ]; then
+    if [ $SILENT -eq 0 ]; then
+        echo "Set $OPEN as default application for $MIME_TYPE ($EXTENSION)..."
+    fi
+    xdg-mime default "$OPEN.desktop" "$MIME_TYPE"
+fi
