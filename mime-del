@@ -1,0 +1,101 @@
+#!/usr/bin/sh
+
+usage() {
+    UTIL_NAME=$(basename "$0")
+
+    cat << EOF
+Usage: ${UTIL_NAME} <mime-type>
+
+Delete a custom MIME type from the system.
+
+Arguments:
+    mime-type    The MIME type (e.g., application/x-myformat)
+
+Optional arguments:
+    -s, --silent        Do not display any messages
+    -g, --global        Delete MIME type system-wide
+    -h, --help          Display this help message
+
+Examples:
+    ${UTIL_NAME} application/x-myscript
+EOF
+    exit 1
+}
+
+# Initialize flags
+SILENT=0
+GLOBAL=0
+MIME_TYPE=""
+
+# Parse command line arguments
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -s|--silent)
+            SILENT=1
+            shift
+            ;;
+        -g|--global)
+            GLOBAL=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$MIME_TYPE" ]; then
+                MIME_TYPE="$1"
+            else
+                echo "Error: Too many arguments"
+                usage
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Check if MIME type is provided
+if [ -z "$MIME_TYPE" ]; then
+    echo "Error: No MIME type specified"
+    usage
+    exit 1
+fi
+
+# get MIME type XML file from mime.history
+if [ $GLOBAL -eq 0 ]; then
+    XML_FILE=$(grep "$MIME_TYPE" "${HOME}/.local/share/mime/mime.history" | cut -d':' -f2)
+else
+    XML_FILE=$(grep "$MIME_TYPE" "/usr/share/mime/mime.history" | cut -d':' -f2)
+fi
+
+# Check if XML file is found
+if [ -z "$XML_FILE" ]; then
+    echo "Error: MIME type $MIME_TYPE not found"
+    exit 1
+fi
+
+# Delete MIME type
+if [ $GLOBAL -eq 0 ]; then
+    if [ $SILENT -eq 0 ]; then
+        echo "Deleting MIME type $MIME_TYPE locally..."
+    fi
+    xdg-mime uninstall --mode user "$XML_FILE"
+else
+    if [ $SILENT -eq 0 ]; then
+        echo "Deleting MIME type $MIME_TYPE globally..."
+    fi
+    xdg-mime uninstall --mode system "$XML_FILE"
+fi
+
+# Delete MIME type from mime.history
+ESCAPED_MIME_TYPE=$(echo "$MIME_TYPE" | sed 's/[\/&]/\\&/g')
+if [ $GLOBAL -eq 0 ]; then
+    sed -i "/$ESCAPED_MIME_TYPE/d" "${HOME}/.local/share/mime/mime.history"
+else
+    sed -i "/$ESCAPED_MIME_TYPE/d" "/usr/share/mime/mime.history"
+fi
