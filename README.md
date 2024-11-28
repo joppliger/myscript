@@ -8,7 +8,11 @@ My personal collection of scripts.
 
 ### Scripts
 
-- [mime-add](mime-add) - Add a file type to the mime database.
+**MIME database management**
+
+- [mime-add](mime-add) - Add a custom MIME type to the database.
+- [mime-list](mime-list) - List custom registered MIME types.
+- [mime-del](mime-del) - Remove a custom MIME type from the database.
 
 ### How to install ?
 
