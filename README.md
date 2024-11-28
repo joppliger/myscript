@@ -6,6 +6,10 @@ My personal collection of scripts.
 
 ---
 
+### Scripts
+
+- [mime-add](mime-add) - Add a file type to the mime database.
+
 ### How to install ?
 
 ```bash
