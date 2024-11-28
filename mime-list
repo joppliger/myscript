@@ -1,16 +1,24 @@
 #!/usr/bin/sh
 
-if [ "$1" = "-h" -o "$1" = "--help" ]; then
-    echo "Usage: $(basename "$0") [OPTION]"
-    echo
-    echo "List registered MIME types."
-    echo
-    echo "Options:"
-    echo "  -l, --local   List only local MIME types"
-    echo "  -g, --global  List only global MIME types"
-    echo "  -s, --silent  Suppress headers"
-    echo "  -h, --help    Display this help message"
+usage() {
+    UTIL_NAME=$(basename "$0")
+
+    cat << EOF
+Usage: ${UTIL_NAME} [OPTION]
+
+List registered MIME types.
+
+Options:
+    -l, --local   List only local MIME types
+    -g, --global  List only global MIME types
+    -s, --silent  Suppress headers
+    -h, --help    Display this help message
+EOF
     exit 0
+}
+
+if [ "$1" = "-h" -o "$1" = "--help" ]; then
+    usage
 fi
 
 # Initialize flags
@@ -38,7 +46,7 @@ while [ $# -gt 0 ]; do
             ;;
         *)
             echo "Error: Unknown option: $1"
-            echo "Try '$(basename "$0") --help' for more information."
+            usage
             exit 1
             ;;
     esac
@@ -53,7 +61,7 @@ GLOBAL_HISTORY_FILE="/usr/share/mime/mime.history"
 # Show global section if requested
 if [ $SHOW_GLOBAL -eq 1 ]; then
     [ $SILENT -eq 0 ] && echo -e "\e[1mGLOBAL\e[0m :"
-    if [ ! -f "$GLOBAL_HISTORY_FILE" ]; then
+    if [ ! -f "$GLOBAL_HISTORY_FILE" ] || [ ! -s "$GLOBAL_HISTORY_FILE" ]; then
         [ $SILENT -eq 0 ] && echo "∅  No globally added MIME types."
     else
         cat "$GLOBAL_HISTORY_FILE"
@@ -63,7 +71,7 @@ fi
 # Show local section if requested
 if [ $SHOW_LOCAL -eq 1 ]; then
     [ $SILENT -eq 0 ] && echo -e "\e[1mLOCAL\e[0m  :"
-    if [ ! -f "$LOCAL_HISTORY_FILE" ]; then
+    if [ ! -f "$LOCAL_HISTORY_FILE" ] || [ ! -s "$LOCAL_HISTORY_FILE" ]; then
         [ $SILENT -eq 0 ] && echo "∅  No locally added MIME types."
     else
         cat "$LOCAL_HISTORY_FILE" | cut -d':' -f1

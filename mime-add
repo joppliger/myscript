@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/sh
 
 usage() {
     UTIL_NAME=$(basename "$0")
@@ -207,7 +207,7 @@ else
     HISTORY="/usr/share/mime/mime.history"
 fi
 
-echo "$MIME_TYPE:$XML_FILE" > "$TMP_HISTORY"
+echo "$XML_FILE" > "$TMP_HISTORY"
 if [ -f "$HISTORY" ]; then
     cat "$HISTORY" >> "$TMP_HISTORY"
 fi
