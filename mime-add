@@ -130,10 +130,10 @@ TMP_DIR=$(mktemp -d)
 trap "rm -rf $TMP_DIR" EXIT KILL TERM
 
 # Create temporary XML file
-XML_FILE="${TMP_DIR}/${EXTENSION}-mime.xml"
+TMP_XML_FILE="${TMP_DIR}/${EXTENSION}-mime.xml"
 
 # Generate XML content
-cat > "$XML_FILE" << EOF
+cat > "$TMP_XML_FILE" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="$MIME_TYPE">
@@ -144,7 +144,7 @@ cat > "$XML_FILE" << EOF
 EOF
 
 # Ensure the file was created
-if [ ! -f "$XML_FILE" ]; then
+if [ ! -f "$TMP_XML_FILE" ]; then
     echo "Error: Failed to create MIME type XML file"
     exit 1
 fi
@@ -178,12 +178,12 @@ if [ $GLOBAL -eq 0 ]; then
     if [ $SILENT -eq 0 ]; then
         echo "Registering MIME type $MIME_TYPE ($EXTENSION) locally..."
     fi
-    xdg-mime install --mode user "$XML_FILE"
+    xdg-mime install --mode user "$TMP_XML_FILE"
 else
     if [ $SILENT -eq 0 ]; then
         echo "Registering MIME type $MIME_TYPE ($EXTENSION) globally..."
     fi
-    xdg-mime install --mode system "$XML_FILE"
+    xdg-mime install --mode system "$TMP_XML_FILE"
 fi
 
 # Open file with application
@@ -193,3 +193,23 @@ if [ -n "$OPEN" ]; then
     fi
     xdg-mime default "$OPEN.desktop" "$MIME_TYPE"
 fi
+
+# Write the path to the installed xml file into mime_history file
+TMP_HISTORY="${TMP_DIR}/mime.history"
+
+if [ $GLOBAL -eq 0 ]; then
+    [ $SILENT -eq 0 ] && echo "Writing MIME type $MIME_TYPE ($EXTENSION) to local mime.history..."
+    XML_FILE="${HOME}/.local/share/mime/${MIME_TYPE}.xml"
+    HISTORY="${HOME}/.local/share/mime/mime.history"
+else
+    [ $SILENT -eq 0 ] && echo "Writing MIME type $MIME_TYPE ($EXTENSION) to global mime.history..."
+    XML_FILE="/usr/share/mime/${MIME_TYPE}.xml"
+    HISTORY="/usr/share/mime/mime.history"
+fi
+
+echo "$MIME_TYPE:$XML_FILE" > "$TMP_HISTORY"
+if [ -f "$HISTORY" ]; then
+    cat "$HISTORY" >> "$TMP_HISTORY"
+fi
+
+sort -u "$TMP_HISTORY" > "$HISTORY"
