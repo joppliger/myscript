@@ -1,0 +1,65 @@
+#!/usr/bin/python
+
+import argparse
+import urllib.request
+import urllib.error
+import json
+import sys
+
+def custom_help():
+    return """
+osi <license> -r <find>:<replace> 
+osi --list        
+"""
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Apply open source licenses',
+        usage=custom_help(),
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    
+    # Add optional arguments with both long and short forms
+    parser.add_argument('-l', '--list', action='store_true',
+                      help='List known licenses')
+    
+    parser.add_argument('-r', '--replace', action='append', type=str,
+                      help='Replace a string in the license text. May be used multiple times')
+    
+    # Add positional argument that's optional
+    parser.add_argument('item', nargs='?', default=None,
+                      help='License name or ID')
+    
+    args = parser.parse_args()
+    
+    if not args.list and not args.item:
+        parser.print_help()
+        exit(1)
+
+    # Handle the arguments
+    if args.list:
+        url = 'https://api.opensource.org/licenses'
+        licenses = urllib.request.urlopen(url).read().decode('utf-8')
+        licenses = json.loads(licenses)
+        for license in licenses:
+            print(f"\033[96m{license['id']}\033[0m: {license['name']}")
+    
+    if args.item:
+        try:
+            url ='https://raw.githubusercontent.com/OpenSourceOrg/licenses/refs/heads/master/texts/plain/' + args.item
+            text = urllib.request.urlopen(url).read().decode('utf-8')
+        except urllib.error.HTTPError as e:
+            print(f"Error: License '{args.item}' not found", file=sys.stderr)
+            exit(1)
+
+        if args.replace:
+            for arg in args.replace:
+                try:    
+                    find, replace = arg.split(':', 1)
+                    text = text.replace(find, replace)
+                except (ValueError, AttributeError) as e:
+                    print("Error: --replace value must be in format <find>:<replace>")
+                    exit(1)
+
+    
+        print(text)

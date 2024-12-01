@@ -14,6 +14,10 @@ My personal collection of scripts.
 - [mime-list](mime-list) - List custom registered MIME types.
 - [mime-del](mime-del) - Remove a custom MIME type from the database.
 
+**License management**
+
+- [osi](osi) - Manage Open Source Initiative licenses.
+
 ### How to install ?
 
 ```bash
