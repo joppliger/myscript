@@ -1,22 +1,49 @@
 #!/usr/bin/sh
 
+usage() {
+    UTIL_NAME=$(basename "$0")
+    echo "Usage: source $UTIL_NAME <key_name>"
+}
+
+# check if script is sourced
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    echo -e "\e[0;31mthis script must be sourced\e[0m"
+    usage
+    exit 1
+fi
+
+# check ssh-add and ssh-agent
+if ! which ssh-add >/dev/null 2>&1 || ! which ssh-agent >/dev/null 2>&1; then
+    echo "please install \`openssh\` on your system"
+    return 1
+fi
+
 # check if argument is given
 if [ -z "$1" ]; then
-    echo "Usage: $0 <key_name>"
-    exit 1
+    usage
+    return 1
 fi
 
 # get first argument
 KEY_NAME=$1
 
 # get key path
-KEY_PATH="$HOME/.ssh"
+SSH_DIR="$HOME/.ssh"
 
 # get the first matching key
-KEY=$(find "$KEY_PATH" -iname "*$KEY_NAME*" -type f | head -n 1)
+KEY_PATH=$(find "$SSH_DIR" -iname "*$KEY_NAME*" -type f | head -n 1)
 
-# run ssh-agent silently
-eval $(ssh-agent) >/dev/null
+# ensure SSH_AUTH_SOCK
+if [ ! -f "$SSH_AUTH_SOCK" ]; then
+    EXISTING_SOCKET=$(find /tmp -uid $(id -u) -type s -name "agent.*" 2>/dev/null | head -n 1)
+    if [ -z "$EXISTING_SOCKET" ]; then
+        eval $(ssh-agent) >/dev/null
+    else
+        SSH_AUTH_SOCK=$EXISTING_SOCKET
+        export SSH_AUTH_SOCK
+    fi
+
+fi
 
 # load key
-ssh-add "$KEY"
+ssh-add "$KEY_PATH"
