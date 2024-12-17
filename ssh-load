@@ -1,0 +1,22 @@
+#!/usr/bin/sh
+
+# check if argument is given
+if [ -z "$1" ]; then
+    echo "Usage: $0 <key_name>"
+    exit 1
+fi
+
+# get first argument
+KEY_NAME=$1
+
+# get key path
+KEY_PATH="$HOME/.ssh"
+
+# get the first matching key
+KEY=$(find "$KEY_PATH" -iname "*$KEY_NAME*" -type f | head -n 1)
+
+# run ssh-agent silently
+eval $(ssh-agent) >/dev/null
+
+# load key
+ssh-add "$KEY"
